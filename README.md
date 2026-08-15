@@ -1,53 +1,66 @@
-# unoq-weather-matrix
+# UNO Q Weather Matrix
 
-Arduino UNO Q weather display: scrolls "Scrimptech", then "Laurel MS", then shows the
-live temperature (static for 5 s) on the built-in 12x9 LED matrix, while all four onboard
-RGB LEDs act as a hot/cold indicator.
+Personal Arduino UNO Q weather display for Scrimptech: scrolls "Scrimptech" and "Laurel MS",
+shows the live temperature on the built-in 12x9 LED matrix, and drives all four onboard RGB
+LEDs as a hot/cold indicator — all from **real observed weather** at Laurel/Noble Field (KLUL).
 
-## How it works
+## What This Is
 
-- Temperature is read from **real observed weather** at Laurel/Noble Field (KLUL),
-  via the NOAA/NWS API (`api.weather.gov/stations/KLUL/observations/latest`). No forecast
-  interpolation, so the displayed value tracks the actual air temperature.
-- LED rule: **red when temp > 95 °F, blue otherwise** (edit the threshold in both files).
-- The four onboard LEDs are driven by two independent paths:
-  - **LED3 / LED4** (MCU pins `LED3_R/G/B`, `LED4_R/G/B`) are driven directly by the
-    sketch with the same value it displays.
-  - **LED1 / LED2** (Linux-controlled via `/sys/class/leds`, channels `red:user/green:user/blue:user`
-    and `red:panic/green:wlan/blue:bt`) are driven by the companion script
-    [`temp_leds.py`](temp_leds.py), which polls the same station every 30 s.
+The Arduino UNO Q is a dual-chip board (STM32U585 MCU + Qualcomm QCM2290 Linux companion).
+This project uses both halves:
 
-## Files
+- The **MCU** runs the sketch: scrolling text on the LED matrix and the static 5 s temperature
+  display, plus driving LED3/LED4.
+- The **Linux side** runs a small Python companion that drives LED1/LED2 over sysfs.
 
-| File                 | Purpose                                                                 |
-|----------------------|-------------------------------------------------------------------------|
-| `unoq-weather-matrix.ino` | Main sketch: matrix scroll/display + LED3/LED4 temp indicator.     |
-| `temp_leds.py`       | Linux companion: polls KLUL and sets LED1/LED2 brightness.             |
+Temperature comes from the NOAA/NWS observation station KLUL (Laurel/Noble Field) — actual
+measured air temperature, no forecast interpolation, so the display tracks a real thermometer.
 
-## Notes / gotchas
+## Features
 
-- `BridgeTCPClient::connect()` / `connectSSL()` return **0 on success, -1 on failure**
-  (not the usual 1/0), so check `>= 0`, not truthiness.
-- The sketch connects to NWS over TLS (`connectSSL`) and lets the router verify against
-  the board's system CA store (`/etc/ssl/certs/ISRG_Root_X1.pem`) — no cert is embedded.
-  If TLS is unreachable it falls back to open-meteo over plain HTTP.
-- The NWS response is ~4.6 KB and `"temperature"` sits past byte 2000, so the fetch
-  buffer is 8 KB.
+- Matrix scroll: `Scrimptech` → `Laurel MS` → live temp (static 5 s, `Font_4x6`)
+- LED rule: **red when temp > 95 °F, blue otherwise** (threshold in one line in both files)
+- TLS fetch from `api.weather.gov` via the board's system CA store (no embedded cert)
+- Fallback to open-meteo over plain HTTP if TLS is unreachable
+- Linux companion polls every 30 s and flips LED1/LED2 to match
 
-## Build & upload
+## Hardware
 
-```sh
-arduino-cli compile --fqbn arduino:zephyr:unoq unoq-weather-matrix
-arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:zephyr:unoq unoq-weather-matrix
-```
+- Arduino UNO Q — STM32U585 MCU (Cortex-M33, 2 MB flash / 786 KB SRAM) + Qualcomm
+  QCM2290/QRB2210 "Imola" Linux companion (4x Kryo-V2 @ 2.0 GHz, Debian, 3.6 GB RAM)
+- Built-in 12x9 monochrome blue LED matrix
+- 4 onboard RGB LEDs:
+  - LED1 / LED2: Linux-controlled (`/sys/class/leds`, on/off)
+  - LED3 / LED4: MCU pins `LED3_R/G/B` + `LED4_R/G/B` (PWM / digital, active-low)
 
-Run the LED1/LED2 companion on the board's Linux side:
+## Getting Started
 
-```sh
-python3 temp_leds.py
-```
+1. Build and flash the sketch:
 
-## Board
+   ```sh
+   ./scripts/flash.sh
+   ```
 
-Arduino UNO Q — STM32U585 MCU (Cortex-M33) + Qualcomm QCM2290/QRB2210 Linux companion,
-Debian Linux, Adreno GPU.
+2. Start the Linux companion (drives LED1/LED2 on the board's Linux side):
+
+   ```sh
+   ./scripts/run_temp_leds.sh
+   ```
+
+3. Power on — the matrix scrolls the sequence and the LEDs reflect the temperature.
+
+## Project Layout
+
+| Path                    | Purpose                                              |
+|-------------------------|------------------------------------------------------|
+| `unoq-weather-matrix.ino` | Main sketch: matrix + LED3/LED4 temp indicator   |
+| `temp_leds.py`          | Linux companion for LED1/LED2 (polls KLUL every 30 s) |
+| `docs/notes.md`         | Hands-on notes: board internals, wiring, gotchas    |
+| `scripts/flash.sh`      | arduino-cli compile + upload                        |
+| `scripts/run_temp_leds.sh` | Push + start the companion on the board          |
+
+## Resources
+
+- [Arduino UNO Q](https://docs.arduino.cc/hardware/uno-q/)
+- [NWS API](https://www.weather.gov/documentation/services-web-api)
+- [KLUL station](https://api.weather.gov/stations/KLUL/observations/latest)
