@@ -19,7 +19,7 @@ measured air temperature, no forecast interpolation, so the display tracks a rea
 ## Features
 
 - Matrix scroll: `Scrimptech` → `Laurel MS` → live temp (static 5 s, `Font_4x6`)
-- LED rule: **red when temp > 95 °F, blue otherwise** (threshold in one line in both files)
+- LED rule: **red when temp >= 99 °F, blue otherwise** (threshold in one line in both files)
 - TLS fetch from `api.weather.gov` via the board's system CA store (no embedded cert)
 - Fallback to open-meteo over plain HTTP if TLS is unreachable
 - Linux companion polls every 30 s and flips LED1/LED2 to match

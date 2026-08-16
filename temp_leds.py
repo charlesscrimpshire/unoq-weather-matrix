@@ -24,7 +24,7 @@ while True:
         value = data["properties"]["temperature"]["value"]
         if value is not None:
             f = int((value * 9 + 2) / 5 + 32)
-            set_leds(LEDS_RED if f > 95 else LEDS_BLUE)
+            set_leds(LEDS_RED if f >= 99 else LEDS_BLUE)
     except Exception:
         pass
     time.sleep(30)

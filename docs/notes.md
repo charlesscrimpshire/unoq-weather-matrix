@@ -20,7 +20,7 @@ Hands-on notes from building and debugging this project on the Arduino UNO Q.
 | LED3 | `LED3_R/G/B` pins | MCU, `analogWrite` (PWM), **inverted** |
 | LED4 | `LED4_R/G/B` pins | MCU, `digitalWrite`, **active-low** |
 
-Rule: **red when temp > 95 °F, blue otherwise** (strict `>`, so 95 °F = blue).
+Rule: **red when temp >= 99 °F, blue otherwise** (so 99 °F = red, 98 °F = blue).
 Threshold lives in one line in each of `unoq-weather-matrix.ino` and `temp_leds.py`.
 
 ## Data source
@@ -33,6 +33,26 @@ fetches, so the display and LEDs disagreed. Switched to **NWS observation statio
 - Value: `properties.temperature.value` (Celsius float; may be `null` — treat as missing)
 - Requires a `User-Agent` header.
 - Observations refresh ~every minute, matching a real thermometer.
+
+## Router socket-leak fix (arduino-router v0.10.0)
+
+While running for hours with no network (NO NET / `-1000` fallback), the companion
+process (Go `arduino-router`) slowly leaked sockets: after ~4.7 h, `lsof -i` showed
+671 open fds and a growing pile of `CLOSE-WAIT` entries, until the process crashed.
+
+Root cause (upstream `internal/network-api/network-api.go`, `tcpRead`): when the TLS
+read returned `(n>0, io.EOF)`, the code **discarded the received bytes and returned an
+RPC error** instead of delivering them. The MCU side sees the error at
+`tcp_client.h:216-218` and sets `_connected = false`, so `client.stop()` skips the
+`tcp/close` RPC — leaving the router's `liveConnections` entry open forever
+(CLOSE-WAIT, fd never freed).
+
+Fix (patched locally, upstream untouched):
+- On timeout or EOF **with data** (`n > 0`): return the bytes `res(buffer[:n], nil)`.
+- On clean EOF (`n == 0`): `delete(liveConnections, id)` and `_ = c.Close()`.
+
+Verified on the board: after reboot + re-upload, fd count stayed flat (11–12 over
+2.5 min) with no accumulating CLOSE-WAIT, even with repeated weather fetches.
 
 ## Gotchas
 

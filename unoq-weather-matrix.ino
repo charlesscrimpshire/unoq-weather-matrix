@@ -15,7 +15,7 @@ void scrollText(const char* s, int dir) {
 }
 
 void setLeds(int f) {
-  bool hot = (f > 95);
+  bool hot = (f >= 99);
   analogWrite(LED3_R, hot ? 255 : 0);
   analogWrite(LED3_G, 0);
   analogWrite(LED3_B, hot ? 0 : 255);
